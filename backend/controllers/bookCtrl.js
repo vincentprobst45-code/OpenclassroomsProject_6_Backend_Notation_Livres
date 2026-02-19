@@ -79,8 +79,14 @@ exports.createBook = (req, res, next) => {
 };
 
 exports.modifyBook = (req, res, next) => {
+  
   let updateFields = {};
-  let newBook = req.body.book;
+  let newBook
+  if(req.body.book) {
+    newBook = req.body.book
+  } else {
+    newBook = req.body
+  }
   if (typeof newBook === 'string') {
     try {
       newBook = JSON.parse(newBook);
@@ -88,7 +94,7 @@ exports.modifyBook = (req, res, next) => {
       return res.status(400).json({ error: 'Invalid book JSON' });
     }
   }
-
+  
   // Only set fields that are present in the request
   const allowedFields = ['userId', 'title', 'author', 'year', 'genre', 'ratings', 'averageRating'];
   allowedFields.forEach(field => {
@@ -96,12 +102,10 @@ exports.modifyBook = (req, res, next) => {
       updateFields[field] = newBook[field];
     }
   });
-
   // Handle image update if a new file is uploaded
   if (req.file) {
-    updateFields.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
+     updateFields.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
   }
-
   Book.updateOne({ _id: req.params.id }, { $set: updateFields }).then(
     () => {
       res.status(200).json({
