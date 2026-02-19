@@ -19,6 +19,7 @@ exports.getOneBook = (req, res, next) => {
     _id: req.params.id
   }).then(
     (book) => {
+      console.log(book)
       res.status(200).json(book);
     }
   ).catch(
@@ -94,7 +95,7 @@ exports.modifyBook = (req, res, next) => {
       return res.status(400).json({ error: 'Invalid book JSON' });
     }
   }
-  
+
   // Only set fields that are present in the request
   const allowedFields = ['userId', 'title', 'author', 'year', 'genre', 'ratings', 'averageRating'];
   allowedFields.forEach(field => {
@@ -106,14 +107,12 @@ exports.modifyBook = (req, res, next) => {
   if (req.file) {
      updateFields.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
   }
-  Book.updateOne({ _id: req.params.id }, { $set: updateFields }).then(
-    () => {
+  Book.updateOne({ _id: req.params.id }, { $set: updateFields }).then(() => {
       res.status(200).json({
         message: 'Book updated successfully!'
       });
     }
-  ).catch(
-    (error) => {
+  ).catch((error) => {
       console.log(error);
       res.status(400).json({
         error: error
@@ -123,14 +122,12 @@ exports.modifyBook = (req, res, next) => {
 };
 
 exports.deleteBook = (req, res, next) => {
-  Book.deleteOne({_id: req.params.id}).then(
-    () => {
+  Book.deleteOne({_id: req.params.id}).then(() => {
       res.status(200).json({
         message: 'Book deleted!'
       });
     }
-  ).catch(
-    (error) => {
+  ).catch((error) => {
       res.status(400).json({
         error: error
       });
@@ -139,5 +136,48 @@ exports.deleteBook = (req, res, next) => {
 };
 
 exports.rateBook = (req, res, next) => {
+  const userId = req.body.userId
+  const rating = req.body.rating
 
+  Book.updateOne({ _id: req.params.id }, 
+    { $push: { ratings: {userId:userId, grade:rating} } }
+  )
+  .then(() => {
+
+    let sumOfRatings = 0;
+    Book.findOne({ _id: req.params.id })
+    .then((book) =>{
+
+      book.ratings.forEach(rating => {
+        sumOfRatings += rating.grade;
+      })
+      Book.updateOne({ _id: req.params.id },  {averageRating: sumOfRatings/book.ratings.length })
+      .then(() => {
+
+        console.log("update ok")
+        Book.findOne({ _id: req.params.id })
+        .then((book) =>{ 
+
+          console.log("sending book as response")
+          res.status(200).send(book);
+        })
+        .catch((error) => {
+        console.log(error);
+        res.status(500).json({error: error});
+        })
+      })
+      .catch((error) => {
+        console.log(error);
+        res.status(400).json({error: error});
+      });
+    })
+    .catch((error) => {
+        console.log(error);
+        res.status(400).json({error: error});
+    });
+  })
+  .catch((error) => {
+    console.log(error);
+    res.status(400).json({error: error});
+  });
 }
