@@ -139,42 +139,57 @@ exports.rateBook = (req, res, next) => {
   const userId = req.body.userId
   const rating = req.body.rating
 
-  Book.updateOne({ _id: req.params.id }, 
-    { $push: { ratings: {userId:userId, grade:rating} } }
-  )
-  .then(() => {
-
-    let sumOfRatings = 0;
-    Book.findOne({ _id: req.params.id })
-    .then((book) =>{
-
-      book.ratings.forEach(rating => {
-        sumOfRatings += rating.grade;
-      })
-      Book.updateOne({ _id: req.params.id },  {averageRating: sumOfRatings/book.ratings.length })
+  Book.findOne({_id:req.params.id}).then((book)=>{
+    if(book.ratings.map(rating => rating.userId).includes(userId))
+    {
+      console.log("User already gave notation")
+      res.status(401).json({message : "User already gave notation"});
+    }
+    else{
+      Book.updateOne({ _id: req.params.id }, 
+        { $push: { ratings: {userId:userId, grade:rating} } }
+      )
       .then(() => {
 
-        console.log("update ok")
+        let sumOfRatings = 0;
         Book.findOne({ _id: req.params.id })
-        .then((book) =>{ 
+        .then((book) =>{
 
-          console.log("sending book as response")
-          res.status(200).send(book);
+          book.ratings.forEach(rating => {
+            sumOfRatings += rating.grade;
+          })
+          Book.updateOne({ _id: req.params.id },  {averageRating: sumOfRatings/book.ratings.length })
+          .then(() => {
+
+            console.log("update ok")
+            Book.findOne({ _id: req.params.id })
+            .then((book) =>{ 
+
+              console.log("sending book as response")
+              res.status(200).send(book);
+            })
+            .catch((error) => {
+            console.log(error);
+            res.status(500).json({error: error});
+            })
+          })
+          .catch((error) => {
+            console.log(error);
+            res.status(400).json({error: error});
+          });
         })
         .catch((error) => {
-        console.log(error);
-        res.status(500).json({error: error});
-        })
+            console.log(error);
+            res.status(400).json({error: error});
+        });
       })
       .catch((error) => {
         console.log(error);
         res.status(400).json({error: error});
       });
-    })
-    .catch((error) => {
-        console.log(error);
-        res.status(400).json({error: error});
-    });
+
+    }
+    
   })
   .catch((error) => {
     console.log(error);
