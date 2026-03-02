@@ -1,4 +1,6 @@
 const Book = require('../models/book');
+const fs = require('fs');
+const path = require('path');
 
 exports.getBooks = (req, res, next) => {
   Book.find().then(
@@ -19,7 +21,6 @@ exports.getOneBook = (req, res, next) => {
     _id: req.params.id
   }).then(
     (book) => {
-      console.log(book)
       res.status(200).json(book);
     }
   ).catch(
@@ -48,10 +49,13 @@ exports.getBestRatings = (req, res, next) => {
   );
 };
 
-exports.createBook = (req, res, next) => {
+exports.createBook = async (req, res, next) => {
+  
+
 
   const newBook = JSON.parse(req.body.book);
   const imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+
 
   const book = new Book({
     userId: newBook.userId,
@@ -79,10 +83,12 @@ exports.createBook = (req, res, next) => {
   );
 };
 
-exports.modifyBook = (req, res, next) => {
+exports.modifyBook = async (req, res, next) => {
   
   let updateFields = {};
   let newBook
+
+  //Check req format
   if(req.body.book) {
     newBook = req.body.book
   } else {
@@ -105,8 +111,23 @@ exports.modifyBook = (req, res, next) => {
   });
   // Handle image update if a new file is uploaded
   if (req.file) {
-     updateFields.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
+    updateFields.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
   }
+
+  //Delete previous image
+  const notYetUpdatedBook = await Book.findOne({_id:req.params.id})
+  if(notYetUpdatedBook.imageUrl){
+    const formerImagePath = path.join(__dirname, '../images', notYetUpdatedBook.imageUrl.split("images/")[1]);
+    await fs.unlink(formerImagePath,
+      (err => {
+          if (err) console.log(err);
+          else {
+              console.log("\nDeleted file");
+          }
+      }));
+  }
+
+  //Update Book
   Book.updateOne({ _id: req.params.id }, { $set: updateFields }).then(() => {
       res.status(200).json({
         message: 'Book updated successfully!'
@@ -135,64 +156,100 @@ exports.deleteBook = (req, res, next) => {
   );
 };
 
-exports.rateBook = (req, res, next) => {
+//
+///////////////// ANCIENNE VERSION DE RATEBOOK
+//
+// exports.rateBook = (req, res, next) => {
+//   const userId = req.body.userId
+//   const rating = req.body.rating
+
+//   Book.findOne({_id:req.params.id}).then((book)=>{
+//     if(book.ratings.map(rating => rating.userId).includes(userId))
+//     {
+//       console.log("User already gave notation")
+//       res.status(401).json({message : "User already gave notation"});
+//     }
+//     else{
+//       Book.updateOne({ _id: req.params.id }, 
+//         { $push: { ratings: {userId:userId, grade:rating} } }
+//       )
+//       .then(() => {
+
+//         let sumOfRatings = 0;
+//         Book.findOne({ _id: req.params.id })
+//         .then((book) =>{
+
+//           book.ratings.forEach(rating => {
+//             sumOfRatings += rating.grade;
+//           })
+//           Book.updateOne({ _id: req.params.id },  {averageRating: sumOfRatings/book.ratings.length })
+//           .then(() => {
+
+//             console.log("update ok")
+//             Book.findOne({ _id: req.params.id })
+//             .then((book) =>{ 
+
+//               console.log("sending book as response")
+//               res.status(200).send(book);
+//             })
+//             .catch((error) => {
+//             console.log(error);
+//             res.status(500).json({error: error});
+//             })
+//           })
+//           .catch((error) => {
+//             console.log(error);
+//             res.status(400).json({error: error});
+//           });
+//         })
+//         .catch((error) => {
+//             console.log(error);
+//             res.status(400).json({error: error});
+//         });
+//       })
+//       .catch((error) => {
+//         console.log(error);
+//         res.status(400).json({error: error});
+//       });
+
+//     }
+    
+//   })
+//   .catch((error) => {
+//     console.log(error);
+//     res.status(400).json({error: error});
+//   });
+// }
+
+//
+////////////// NOUVELLE VERSION DE RATEBOOK
+//
+exports.rateBook2 = async (req, res, next) => {
   const userId = req.body.userId
   const rating = req.body.rating
+  const book = await Book.findOne({_id:req.params.id})
 
-  Book.findOne({_id:req.params.id}).then((book)=>{
-    if(book.ratings.map(rating => rating.userId).includes(userId))
-    {
-      console.log("User already gave notation")
-      res.status(401).json({message : "User already gave notation"});
-    }
-    else{
-      Book.updateOne({ _id: req.params.id }, 
-        { $push: { ratings: {userId:userId, grade:rating} } }
-      )
-      .then(() => {
+  if(book.ratings.map(rating => rating.userId).includes(userId))
+  {
+    console.log("User already gave notation")
+    res.status(401).json({message : "User already gave notation"});
+  }
+  else{
+    book.ratings.push({userId:userId, grade:rating})
 
-        let sumOfRatings = 0;
-        Book.findOne({ _id: req.params.id })
-        .then((book) =>{
-
-          book.ratings.forEach(rating => {
+    let sumOfRatings = 0;
+    book.ratings.forEach(rating => {
             sumOfRatings += rating.grade;
           })
-          Book.updateOne({ _id: req.params.id },  {averageRating: sumOfRatings/book.ratings.length })
-          .then(() => {
+    book.averageRating = sumOfRatings/book.ratings.length
 
-            console.log("update ok")
-            Book.findOne({ _id: req.params.id })
-            .then((book) =>{ 
+    book.save().then(savedBook => {
+      if(savedBook === book)
+      {
+        res.status(200).send(book);
+      }
+    });
+  }
 
-              console.log("sending book as response")
-              res.status(200).send(book);
-            })
-            .catch((error) => {
-            console.log(error);
-            res.status(500).json({error: error});
-            })
-          })
-          .catch((error) => {
-            console.log(error);
-            res.status(400).json({error: error});
-          });
-        })
-        .catch((error) => {
-            console.log(error);
-            res.status(400).json({error: error});
-        });
-      })
-      .catch((error) => {
-        console.log(error);
-        res.status(400).json({error: error});
-      });
 
-    }
-    
-  })
-  .catch((error) => {
-    console.log(error);
-    res.status(400).json({error: error});
-  });
 }
