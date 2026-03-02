@@ -112,19 +112,19 @@ exports.modifyBook = async (req, res, next) => {
   // Handle image update if a new file is uploaded
   if (req.file) {
     updateFields.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
-  }
 
-  //Delete previous image
-  const notYetUpdatedBook = await Book.findOne({_id:req.params.id})
-  if(notYetUpdatedBook.imageUrl){
-    const formerImagePath = path.join(__dirname, '../images', notYetUpdatedBook.imageUrl.split("images/")[1]);
-    await fs.unlink(formerImagePath,
-      (err => {
-          if (err) console.log(err);
-          else {
-              console.log("\nDeleted file");
-          }
-      }));
+    //Delete previous image
+    const notYetUpdatedBook = await Book.findOne({_id:req.params.id})
+    if(notYetUpdatedBook.imageUrl){
+      const formerImagePath = path.join(__dirname, '../images', notYetUpdatedBook.imageUrl.split("images/")[1]);
+      await fs.unlink(formerImagePath,
+        (err => {
+            if (err) console.log(err);
+            else {
+                console.log("\nDeleted file");
+            }
+        }));
+    }
   }
 
   //Update Book
