@@ -142,7 +142,20 @@ exports.modifyBook = async (req, res, next) => {
   );
 };
 
-exports.deleteBook = (req, res, next) => {
+exports.deleteBook = async (req, res, next) => {
+  //Delete image
+  const bookToBeDeleted = await Book.findOne({_id:req.params.id})
+  if(bookToBeDeleted.imageUrl){
+    const formerImagePath = path.join(__dirname, '../images', bookToBeDeleted.imageUrl.split("images/")[1]);
+    await fs.unlink(formerImagePath,
+      (err => {
+          if (err) console.log(err);
+          else {
+              console.log("\nDeleted file");
+          }
+      }));
+  }
+  //Delete book
   Book.deleteOne({_id: req.params.id}).then(() => {
       res.status(200).json({
         message: 'Book deleted!'
